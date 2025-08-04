@@ -7,9 +7,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!decoded) return
 
   if (req.method === 'GET') {
+    const { category, status } = req.query
+
     try {
+      const filters: any = {
+        userId: decoded.userId,
+      }
+
+      if (category) {
+        filters.category = {
+          name: category as string
+        }
+      }
+
+      if (status === 'completed') {
+        filters.completed = true
+      } else if (status === 'pending') {
+        filters.completed = false
+      }
+
       const tasks = await prisma.task.findMany({
-        where: { userId: decoded.userId },
+        where: filters,
         include: {
           category: true
         },
@@ -17,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           createdAt: 'desc'
         }
       })
+
       return res.status(200).json(tasks)
     } catch (error) {
       console.error(error)
