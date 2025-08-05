@@ -1,44 +1,42 @@
-// pages/api/tasks/[id].ts
-import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
-import { getToken } from 'next-auth/jwt';
+import type { NextApiRequest, NextApiResponse } from "next"
+import { prisma } from "@/lib/prisma"
+import { verifyToken } from "@/lib/auth"
+import { taskSchema } from "@/lib/validation"
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const decoded = verifyToken(req, res)
+  if (!decoded) return
 
-  if (!token) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
+  const userId = decoded.userId
+  const { id } = req.query
 
-  const { id } = req.query;
-
-  if (req.method === 'PUT') {
-    const { title, description, categoryId } = req.body;
+  if (req.method === "PUT") {
+    const parsed = taskSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten().fieldErrors })
+    }
 
     try {
-      const updatedTask = await prisma.task.update({
-        where: { id: String(id), userId: token.sub },
-        data: { title, description, categoryId },
-      });
-      return res.status(200).json(updatedTask);
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Failed to update task' });
+      const updated = await prisma.task.updateMany({
+        where: { id: String(id), userId },
+        data: parsed.data,
+      })
+      return res.status(200).json({ message: "Task updated", updated })
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to update task" })
     }
   }
 
-  if (req.method === 'DELETE') {
+  if (req.method === "DELETE") {
     try {
-      await prisma.task.delete({
-        where: { id: String(id), userId: token.sub },
-      });
-      return res.status(204).end(); // No content
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Failed to delete task' });
+      const deleted = await prisma.task.deleteMany({
+        where: { id: String(id), userId },
+      })
+      return res.status(200).json({ message: "Task deleted", deleted })
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to delete task" })
     }
   }
 
-  res.setHeader('Allow', ['PUT', 'DELETE']);
-  return res.status(405).end(`Method ${req.method} Not Allowed`);
+  res.status(405).json({ error: "Method not allowed" })
 }

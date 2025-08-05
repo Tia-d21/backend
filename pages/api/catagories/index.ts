@@ -1,34 +1,39 @@
-// pages/api/categories/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
+import { categorySchema } from '@/utils/validation'
+
+
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.status(200).json({ message: "Categories route working ✅" })
   if (req.method === 'GET') {
     try {
       const categories = await prisma.category.findMany()
       return res.status(200).json(categories)
-    } catch (error) {
-      console.error(error)
+    } catch (err) {
       return res.status(500).json({ message: 'Failed to fetch categories' })
     }
-  } else if (req.method === 'POST') {
+  }
+
+  if (req.method === 'POST') {
     const decoded = verifyToken(req, res)
     if (!decoded) return
 
-    const { name } = req.body
-    if (!name) {
-      return res.status(400).json({ message: 'Category name is required' })
+    const parsed = categorySchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ errors: parsed.error.issues })
     }
 
     try {
-      const newCategory = await prisma.category.create({ data: { name } })
-      return res.status(201).json(newCategory)
-    } catch (error) {
-      console.error(error)
+      const category = await prisma.category.create({
+        data: { name: parsed.data.name }
+      })
+      return res.status(201).json(category)
+    } catch (err) {
       return res.status(500).json({ message: 'Failed to create category' })
     }
-  } else {
-    return res.status(405).json({ message: 'Method not allowed' })
   }
+
+  return res.status(405).json({ message: 'Method not allowed' })
 }

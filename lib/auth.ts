@@ -1,26 +1,22 @@
-// lib/auth.ts
-import jwt from 'jsonwebtoken'
-import type { NextApiRequest, NextApiResponse } from 'next'
+import { NextApiRequest, NextApiResponse } from "next"
+import jwt from "jsonwebtoken"
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret'
-
-export function generateToken(payload: any) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
-}
+const JWT_SECRET = process.env.JWT_SECRET || "yourSuperSecretKey123!"
 
 export function verifyToken(req: NextApiRequest, res: NextApiResponse): any {
   const authHeader = req.headers.authorization
-
-  if (!authHeader) {
-    res.status(401).json({ message: 'Missing Authorization header' })
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Unauthorized" })
     return null
   }
 
-  const token = authHeader.split(' ')[1]
+  const token = authHeader.split(" ")[1]
+
   try {
-    return jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, JWT_SECRET)
+    return decoded
   } catch (error) {
-    res.status(401).json({ message: 'Invalid or expired token' })
+    res.status(401).json({ error: "Invalid or expired token" })
     return null
   }
 }
